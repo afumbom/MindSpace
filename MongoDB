@@ -1,0 +1,312 @@
+MongoDB Collections:
+Users: Stores user profiles, including authentication details and mental health history.
+Therapy Sessions: Stores information about therapy sessions, including bookings.
+Resources: Stores educational content, like articles, podcasts, and videos.
+Mood Logs: Records daily mood logs for each user.
+Journal Entries: Stores personal journal entries for users.
+Peer Support Groups: Information about groups (if implemented).
+MongoDB Database Setup
+1. User Schema (User.js)
+The User schema stores user profile information, authentication data, and any preferences related to their mental health journey.
+
+javascript
+Copy code
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');  // For password hashing
+
+const userSchema = new mongoose.Schema({
+  firstName: {
+    type: String,
+    required: true,
+  },
+  lastName: {
+    type: String,
+    required: true,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  password: {
+    type: String,
+    required: true,
+  },
+  profilePicture: {
+    type: String,  // URL or path to the user's profile picture
+  },
+  moodLogs: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MoodLog',
+  }],
+  journalEntries: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'JournalEntry',
+  }],
+  therapySessions: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'TherapySession',
+  }],
+  preferences: {
+    therapyType: {
+      type: String,
+      enum: ['Cognitive Behavioral Therapy', 'Dialectical Behavior Therapy', 'Other'],
+    },
+    selfCarePractices: [String],
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+// Hash the user's password before saving
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password, salt);
+  next();
+});
+
+// Compare password for login
+userSchema.methods.comparePassword = async function (password) {
+  return bcrypt.compare(password, this.password);
+};
+
+module.exports = mongoose.model('User', userSchema);
+2. Therapy Session Schema (TherapySession.js)
+This schema will store details about therapy session bookings.
+
+javascript
+Copy code
+const mongoose = require('mongoose');
+
+const therapySessionSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  therapist: {
+    type: String,  // Name or ID of the therapist
+    required: true,
+  },
+  sessionDate: {
+    type: Date,
+    required: true,
+  },
+  sessionType: {
+    type: String,
+    enum: ['Individual', 'Group'],
+    required: true,
+  },
+  status: {
+    type: String,
+    enum: ['Booked', 'Completed', 'Canceled'],
+    default: 'Booked',
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+module.exports = mongoose.model('TherapySession', therapySessionSchema);
+3. Resources Schema (Resource.js)
+The Resource schema stores various mental health resources like articles, podcasts, and videos.
+
+javascript
+Copy code
+const mongoose = require('mongoose');
+
+const resourceSchema = new mongoose.Schema({
+  title: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+    required: true,
+  },
+  type: {
+    type: String,
+    enum: ['Article', 'Podcast', 'Video'],
+    required: true,
+  },
+  contentUrl: {
+    type: String,  // URL to the article, podcast, or video
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+module.exports = mongoose.model('Resource', resourceSchema);
+4. Mood Log Schema (MoodLog.js)
+This schema records mood entries by the user.
+
+javascript
+Copy code
+const mongoose = require('mongoose');
+
+const moodLogSchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  mood: {
+    type: String,  // E.g., "Happy", "Sad", "Neutral"
+    required: true,
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
+  triggers: [String],  // List of triggers (e.g., stress, social interactions)
+});
+
+module.exports = mongoose.model('MoodLog', moodLogSchema);
+5. Journal Entry Schema (JournalEntry.js)
+This schema stores journal entries written by users.
+
+javascript
+Copy code
+const mongoose = require('mongoose');
+
+const journalEntrySchema = new mongoose.Schema({
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+  },
+  content: {
+    type: String,
+    required: true,
+  },
+  date: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+module.exports = mongoose.model('JournalEntry', journalEntrySchema);
+6. Peer Support Group Schema (PeerSupportGroup.js)
+This schema stores peer support group information (if applicable).
+
+javascript
+Copy code
+const mongoose = require('mongoose');
+
+const peerSupportGroupSchema = new mongoose.Schema({
+  groupName: {
+    type: String,
+    required: true,
+  },
+  description: {
+    type: String,
+    required: true,
+  },
+  members: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+module.exports = mongoose.model('PeerSupportGroup', peerSupportGroupSchema);
+Database Setup Example (db.js)
+This is the database connection file to set up MongoDB using Mongoose:
+
+javascript
+Copy code
+const mongoose = require('mongoose');
+
+const connectDB = async () => {
+  try {
+    await mongoose.connect(process.env.MONGO_URI, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      useFindAndModify: false,
+    });
+    console.log('MongoDB connected successfully');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    process.exit(1);  // Stop the application if DB connection fails
+  }
+};
+
+module.exports = connectDB;
+In your .env file, include the MongoDB URI:
+
+bash
+Copy code
+MONGO_URI=mongodb://localhost:27017/mindspace  # Change this if using MongoDB Atlas
+Basic Operations (Example)
+Creating a User:
+
+javascript
+Copy code
+const User = require('./models/User');
+
+const createUser = async () => {
+  const user = new User({
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john.doe@example.com',
+    password: 'securepassword123',
+  });
+
+  await user.save();
+};
+Creating a Therapy Session:
+
+javascript
+Copy code
+const TherapySession = require('./models/TherapySession');
+
+const createSession = async () => {
+  const session = new TherapySession({
+    user: userId,  // Reference to the user
+    therapist: 'Dr. Smith',
+    sessionDate: new Date('2025-05-01T14:00:00Z'),
+    sessionType: 'Individual',
+  });
+
+  await session.save();
+};
+Fetching Resources:
+
+javascript
+Copy code
+const Resource = require('./models/Resource');
+
+const getResources = async () => {
+  const resources = await Resource.find();
+  return resources;
+};
+Recording a Mood Log:
+
+javascript
+Copy code
+const MoodLog = require('./models/MoodLog');
+
+const logMood = async () => {
+  const moodLog = new MoodLog({
+    user: userId,
+    mood: 'Happy',
+    triggers: ['exercise'],
+  });
+
+  await moodLog.save();
+};
+Considerations for Scaling:
+Indexes: Create indexes on frequently queried fields (e.g., email in the User schema, sessionDate in the TherapySession schema).
+Database Sharding: As the user base grows, you may need to scale your MongoDB instance horizontally with sharding.
+Data Backup: Regularly back up your database to prevent data loss.
+Cloud Hosting: Consider using MongoDB Atlas for managed cloud hosting and scaling, especially if you expect high traffic.
